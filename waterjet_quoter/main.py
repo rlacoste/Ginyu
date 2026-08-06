@@ -2,6 +2,8 @@
 import argparse
 import sys
 
+import ezdxf
+
 from .costing import compute_cutting_time, estimate_material, compute_price
 from .geometry import extract_pieces
 from .ingestion import load_dxf
@@ -45,6 +47,13 @@ def main(argv=None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
+    if args.qty < 1:
+        print(
+            f"Erreur: la quantité doit être un entier positif (reçu: {args.qty})",
+            file=sys.stderr,
+        )
+        return 1
+
     try:
         result = run(args.dxf_path, args.material, args.thickness, args.quality, args.qty)
     except MaterialNotFoundError as e:
@@ -52,6 +61,15 @@ def main(argv=None) -> int:
         return 1
     except FileNotFoundError:
         print(f"Erreur: fichier introuvable: {args.dxf_path}", file=sys.stderr)
+        return 1
+    except ezdxf.DXFStructureError as e:
+        print(f"Erreur: fichier DXF invalide ou corrompu: {e}", file=sys.stderr)
+        return 1
+    except OSError as e:
+        print(f"Erreur: impossible de lire le fichier {args.dxf_path}: {e}", file=sys.stderr)
+        return 1
+    except KeyError as e:
+        print(f"Erreur: configuration incomplète: {e}", file=sys.stderr)
         return 1
 
     if args.json:

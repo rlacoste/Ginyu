@@ -49,3 +49,40 @@ def test_main_cli_missing_material_exit_code(tmp_path, capsys):
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "Erreur" in captured.err
+
+
+def test_main_cli_malformed_dxf_exit_code(tmp_path, capsys):
+    dxf_path = tmp_path / "garbage.dxf"
+    dxf_path.write_bytes(b"not a real dxf file\nrandom garbage bytes\n")
+
+    exit_code = main([str(dxf_path), "--material", "aluminum", "--thickness", "6mm"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur" in captured.err
+
+
+def test_main_cli_zero_qty_rejected(tmp_path, capsys):
+    dxf_path = tmp_path / "plate.dxf"
+    make_test_plate(str(dxf_path))
+
+    exit_code = main(
+        [str(dxf_path), "--material", "aluminum", "--thickness", "6mm", "--qty", "0"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur" in captured.err
+
+
+def test_main_cli_negative_qty_rejected(tmp_path, capsys):
+    dxf_path = tmp_path / "plate.dxf"
+    make_test_plate(str(dxf_path))
+
+    exit_code = main(
+        [str(dxf_path), "--material", "aluminum", "--thickness", "6mm", "--qty", "-5"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur" in captured.err
