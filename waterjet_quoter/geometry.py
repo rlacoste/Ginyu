@@ -63,6 +63,7 @@ def chain_open_segments(segments: List[List[Point]], tolerance: float) -> ChainR
         chain = list(segments[start_idx])
         start_key = _snap(chain[0], tolerance)
 
+        # Forward extension: extend from chain[-1]
         progressed = True
         while progressed:
             progressed = False
@@ -82,7 +83,28 @@ def chain_open_segments(segments: List[List[Point]], tolerance: float) -> ChainR
                     progressed = True
                     break
 
-        if _snap(chain[-1], tolerance) == start_key and len(chain) > 1:
+        # Backward extension: extend from chain[0] if not yet closed
+        if not (_snap(chain[-1], tolerance) == start_key and len(chain) > 1):
+            progressed = True
+            while progressed:
+                progressed = False
+                current_key = _snap(chain[0], tolerance)
+                if current_key == _snap(chain[-1], tolerance) and len(chain) > 1:
+                    break
+                for i, idx in enumerate(remaining):
+                    seg = segments[idx]
+                    if _snap(seg[-1], tolerance) == current_key:
+                        chain = seg[:-1] + chain
+                        remaining.pop(i)
+                        progressed = True
+                        break
+                    if _snap(seg[0], tolerance) == current_key:
+                        chain = list(reversed(seg))[:-1] + chain
+                        remaining.pop(i)
+                        progressed = True
+                        break
+
+        if _snap(chain[-1], tolerance) == _snap(chain[0], tolerance) and len(chain) > 1:
             closed_contours.append(chain)
         else:
             incomplete_contours.append(chain)
