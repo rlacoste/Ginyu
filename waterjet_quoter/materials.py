@@ -16,6 +16,9 @@ DEFAULT_TABLE_PATH = Path(__file__).parent / "materials.json"
 class MaterialNotFoundError(KeyError):
     """Raised when a (material, thickness, quality) triplet is not in the table."""
 
+    def __str__(self):
+        return self.args[0] if self.args else ""
+
 
 @dataclass(frozen=True)
 class MaterialParams:

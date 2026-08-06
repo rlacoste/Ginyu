@@ -48,3 +48,14 @@ def test_lookup_raises_for_unknown_quality():
     table = {"aluminum": {"6mm": {"standard": {"feed_rate_ipm": 18.0, "pierce_time_sec": 3.0}}}}
     with pytest.raises(MaterialNotFoundError):
         lookup("aluminum", "6mm", quality="fine", table=table)
+
+
+def test_material_not_found_error_str_has_no_stray_quotes():
+    table = {"aluminum": {"6mm": {"standard": {"feed_rate_ipm": 18.0, "pierce_time_sec": 3.0}}}}
+    with pytest.raises(MaterialNotFoundError) as exc_info:
+        lookup("titanium", "6mm", table=table)
+
+    message = str(exc_info.value)
+    assert not message.startswith('"')
+    assert not message.endswith('"')
+    assert "titanium" in message
