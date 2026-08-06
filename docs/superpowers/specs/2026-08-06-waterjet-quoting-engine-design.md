@@ -215,10 +215,11 @@ optionnel (défaut `"standard"`).
 {
   "input": {"file": "...", "material": "aluminum", "thickness": "6mm", "quality": "standard", "quantity": 50},
   "pieces": [
-    {"piece_id": 0, "cut_length_in": 35.14, "pierce_count": 2, "bbox_width_in": 10.0, "bbox_height_in": 6.0, "area_in2": 60.0}
+    {"piece_id": 0, "cut_length_in": 35.14, "pierce_count": 2, "bbox_width_in": 10.0, "bbox_height_in": 6.0, "area_in2": 60.0, "unit_time_min": 2.53}
   ],
-  "cutting_time": {"unit_time_min": 2.53, "quantity": 50, "total_time_min": 126.5},
+  "cutting_time": {"quantity": 50, "total_time_min": 126.5},
   "material_estimate": {"total_area_in2": 3000.0, "sheets_needed": 2, "utilization_factor": 0.75, "warnings": []},
+  "geometry_warnings": [],
   "pricing": {
     "machine_time_cost": 263.5,
     "material_cost": 400.0,
