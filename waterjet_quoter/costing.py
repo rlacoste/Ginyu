@@ -85,3 +85,29 @@ def estimate_material(pieces: List[Piece], quantity: int) -> MaterialEstimateRes
         utilization_factor=config.NESTING_UTILIZATION_FACTOR,
         warnings=warnings,
     )
+
+
+@dataclass
+class PricingResult:
+    machine_time_cost: float
+    material_cost: float
+    labor_cost: float
+    total_price: float
+
+
+def compute_price(total_time_min: float, sheets_needed: int, material: str) -> PricingResult:
+    if material not in config.SHEET_COST_BY_MATERIAL:
+        raise KeyError(
+            f"No sheet cost configured for material {material!r} in "
+            f"config.SHEET_COST_BY_MATERIAL."
+        )
+    machine_time_cost = (total_time_min / 60.0) * config.MACHINE_RATE_PER_HOUR
+    material_cost = sheets_needed * config.SHEET_COST_BY_MATERIAL[material]
+    labor_cost = sum(config.LABOR_FLAT_FEES.values())
+    total_price = machine_time_cost + material_cost + labor_cost
+    return PricingResult(
+        machine_time_cost=machine_time_cost,
+        material_cost=material_cost,
+        labor_cost=labor_cost,
+        total_price=total_price,
+    )
