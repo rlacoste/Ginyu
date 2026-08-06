@@ -31,6 +31,8 @@ def is_entity_closed(entity) -> bool:
         return True
     if dxftype in ("LWPOLYLINE", "POLYLINE"):
         return bool(entity.is_closed)
+    if dxftype == "SPLINE":
+        return bool(entity.closed)
     return False
 
 
@@ -236,11 +238,24 @@ def extract_pieces(
 
     closed_contours: List[Contour] = []
     open_segments: List[List[Point]] = []
+    warnings: List[str] = []
 
     for entity in msp:
         if entity.dxftype() not in SUPPORTED_DXFTYPES:
             continue
-        points = flatten_entity(entity, flattening_distance)
+        try:
+            points = flatten_entity(entity, flattening_distance)
+        except (TypeError, ValueError) as exc:
+            warnings.append(
+                f"Entité {entity.dxftype()} ignorée : géométrie non exploitable ({exc})."
+            )
+            continue
+        if len(points) < 2:
+            warnings.append(
+                f"Entité {entity.dxftype()} ignorée : géométrie non exploitable "
+                f"(pas assez de points après aplatissement)."
+            )
+            continue
         if is_entity_closed(entity):
             if points[0] != points[-1]:
                 points = points + [points[0]]
@@ -248,7 +263,6 @@ def extract_pieces(
         else:
             open_segments.append(points)
 
-    warnings: List[str] = []
     if open_segments:
         chain_result = chain_open_segments(open_segments, chaining_tolerance)
         closed_contours.extend(Contour(points=c) for c in chain_result.closed_contours)
@@ -259,4 +273,8 @@ def extract_pieces(
             )
 
     pieces = group_contours_into_pieces(closed_contours)
+    if not pieces:
+        warnings.append(
+            "Aucune pièce exploitable détectée dans ce DXF — vérifier le fichier source."
+        )
     return ExtractionResult(pieces=pieces, warnings=warnings)

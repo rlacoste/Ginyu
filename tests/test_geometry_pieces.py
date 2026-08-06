@@ -89,7 +89,62 @@ def test_extract_pieces_reports_incomplete_contour_as_warning():
     result = extract_pieces(doc)
 
     assert len(result.pieces) == 0
-    assert len(result.warnings) == 1
+    # One warning for the incomplete contour itself, plus one for the fact
+    # that this leaves zero extractable pieces overall.
+    assert len(result.warnings) == 2
+    assert any("incomplet" in w.lower() for w in result.warnings)
+    assert any("Aucune pièce" in w for w in result.warnings)
+
+
+def test_extract_pieces_includes_closed_spline_as_a_contour():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    spline = msp.add_spline(fit_points=[(0, 0), (10, 0), (10, 10), (0, 10)])
+    spline.closed = True
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 1
+    piece = result.pieces[0]
+    assert piece.pierce_count == 1
+    assert piece.cut_length_in > 0
+    # No warning: the spline should be chained into a piece, not dropped as
+    # an incomplete contour.
+    assert result.warnings == []
+
+
+def test_extract_pieces_skips_zero_radius_circle_with_warning():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_circle(center=(0, 0), radius=0)
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_skips_unsupported_polymesh_with_warning():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    mesh = msp.add_polymesh(size=(3, 3))
+    for i in range(3):
+        for j in range(3):
+            mesh.set_mesh_vertex((i, j), (i, j, 0))
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_empty_dxf_produces_no_pieces_warning():
+    doc = ezdxf.new(setup=True)
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("Aucune pièce" in w for w in result.warnings)
 
 
 def test_group_contours_unattachable_hole_treated_as_independent_piece():

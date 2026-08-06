@@ -51,3 +51,12 @@ def test_is_entity_closed_lwpolyline_respects_close_flag():
     open_poly = msp.add_lwpolyline([(0, 0), (1, 0), (1, 1)], close=False)
     assert is_entity_closed(closed_poly) is True
     assert is_entity_closed(open_poly) is False
+
+
+def test_is_entity_closed_spline_respects_closed_flag():
+    msp = _msp()
+    closed_spline = msp.add_spline(fit_points=[(0, 0), (5, 0), (5, 5), (0, 5)])
+    closed_spline.closed = True
+    open_spline = msp.add_spline(fit_points=[(0, 0), (5, 0), (5, 5), (0, 5)])
+    assert is_entity_closed(closed_spline) is True
+    assert is_entity_closed(open_spline) is False
