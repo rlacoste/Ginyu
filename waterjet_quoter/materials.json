@@ -1,0 +1,14 @@
+{
+  "aluminum": {
+    "6mm": { "standard": { "feed_rate_ipm": 18.0, "pierce_time_sec": 3.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 9.0, "pierce_time_sec": 6.0 } }
+  },
+  "mild_steel": {
+    "6mm": { "standard": { "feed_rate_ipm": 14.0, "pierce_time_sec": 4.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 7.0, "pierce_time_sec": 8.0 } }
+  },
+  "stainless_steel": {
+    "6mm": { "standard": { "feed_rate_ipm": 10.0, "pierce_time_sec": 5.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 5.0, "pierce_time_sec": 10.0 } }
+  }
+}
