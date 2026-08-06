@@ -110,3 +110,145 @@ def chain_open_segments(segments: List[List[Point]], tolerance: float) -> ChainR
             incomplete_contours.append(chain)
 
     return ChainResult(closed_contours, incomplete_contours)
+
+
+def polyline_length(points: List[Point]) -> float:
+    return sum(
+        math.hypot(x2 - x1, y2 - y1)
+        for (x1, y1), (x2, y2) in zip(points, points[1:])
+    )
+
+
+def point_in_polygon(point: Point, polygon: List[Point]) -> bool:
+    """Ray-casting point-in-polygon test. `polygon` is a closed loop of points."""
+    x, y = point
+    inside = False
+    n = len(polygon)
+    for i in range(n):
+        x1, y1 = polygon[i]
+        x2, y2 = polygon[(i + 1) % n]
+        if (y1 > y) != (y2 > y):
+            x_intersect = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x < x_intersect:
+                inside = not inside
+    return inside
+
+
+@dataclass
+class Contour:
+    points: List[Point]
+
+
+@dataclass
+class Piece:
+    piece_id: int
+    contours: List[Contour]
+
+    @property
+    def cut_length_in(self) -> float:
+        return sum(polyline_length(c.points) for c in self.contours)
+
+    @property
+    def pierce_count(self) -> int:
+        return len(self.contours)
+
+    @property
+    def bbox(self) -> Tuple[float, float]:
+        xs = [p[0] for c in self.contours for p in c.points]
+        ys = [p[1] for c in self.contours for p in c.points]
+        return (max(xs) - min(xs), max(ys) - min(ys))
+
+    @property
+    def area_in2(self) -> float:
+        width, height = self.bbox
+        return width * height
+
+
+def _contour_depth(index: int, contours: List[Contour]) -> int:
+    test_point = contours[index].points[0]
+    depth = 0
+    for j, other in enumerate(contours):
+        if j == index:
+            continue
+        if point_in_polygon(test_point, other.points):
+            depth += 1
+    return depth
+
+
+def group_contours_into_pieces(contours: List[Contour]) -> List[Piece]:
+    """Group contours into pieces using nesting-depth parity.
+
+    A contour's depth is how many other contours contain it. Even depth
+    (0, 2, 4...) starts a new piece (an outer boundary, or a solid island
+    sitting inside a hole). Odd depth is a hole, attached to its direct
+    parent (the next contour up in depth that contains it).
+    """
+    depths = [_contour_depth(i, contours) for i in range(len(contours))]
+
+    def find_parent(i: int) -> int:
+        best_parent = None
+        best_depth = -1
+        for j, other in enumerate(contours):
+            if j == i or depths[j] >= depths[i]:
+                continue
+            if point_in_polygon(contours[i].points[0], other.points) and depths[j] > best_depth:
+                best_parent = j
+                best_depth = depths[j]
+        return best_parent
+
+    pieces_by_outer_index = {}
+    pieces: List[Piece] = []
+    next_id = 0
+
+    for i in sorted(range(len(contours)), key=lambda idx: depths[idx]):
+        if depths[i] % 2 == 0:
+            piece = Piece(piece_id=next_id, contours=[contours[i]])
+            pieces_by_outer_index[i] = piece
+            pieces.append(piece)
+            next_id += 1
+        else:
+            parent_idx = find_parent(i)
+            pieces_by_outer_index[parent_idx].contours.append(contours[i])
+
+    return pieces
+
+
+@dataclass
+class ExtractionResult:
+    pieces: List[Piece]
+    warnings: List[str]
+
+
+def extract_pieces(
+    drawing: Drawing,
+    flattening_distance: float = config.FLATTENING_DISTANCE_IN,
+    chaining_tolerance: float = config.CHAINING_TOLERANCE_IN,
+) -> ExtractionResult:
+    msp = drawing.modelspace()
+
+    closed_contours: List[Contour] = []
+    open_segments: List[List[Point]] = []
+
+    for entity in msp:
+        if entity.dxftype() not in SUPPORTED_DXFTYPES:
+            continue
+        points = flatten_entity(entity, flattening_distance)
+        if is_entity_closed(entity):
+            if points[0] != points[-1]:
+                points = points + [points[0]]
+            closed_contours.append(Contour(points=points))
+        else:
+            open_segments.append(points)
+
+    warnings: List[str] = []
+    if open_segments:
+        chain_result = chain_open_segments(open_segments, chaining_tolerance)
+        closed_contours.extend(Contour(points=c) for c in chain_result.closed_contours)
+        for incomplete in chain_result.incomplete_contours:
+            warnings.append(
+                f"Contour incomplet détecté ({len(incomplete)} points) — "
+                f"segments non refermés en boucle, exclu du calcul."
+            )
+
+    pieces = group_contours_into_pieces(closed_contours)
+    return ExtractionResult(pieces=pieces, warnings=warnings)
