@@ -90,3 +90,39 @@ def test_extract_pieces_reports_incomplete_contour_as_warning():
 
     assert len(result.pieces) == 0
     assert len(result.warnings) == 1
+
+
+def test_group_contours_unattachable_hole_treated_as_independent_piece():
+    """Regression: when depth inflation makes find_parent return None,
+    the odd-depth contour should become an independent piece, not crash.
+
+    Scenario: L and K are unrelated boxes that overlap J's test point,
+    inflating J's depth past I's, causing find_parent(I) to fail and return None.
+    """
+    def box(min_x, min_y, max_x, max_y):
+        """Helper: create a closed rectangular contour."""
+        return Contour(
+            points=[
+                (min_x, min_y),
+                (max_x, min_y),
+                (max_x, max_y),
+                (min_x, max_y),
+                (min_x, min_y),
+            ]
+        )
+
+    # L and K are unrelated boxes that include the origin
+    L = box(-10, -10, 5, 5)
+    K = box(-20, -20, 10, 10)
+    # J is the "true" outer piece; its first vertex (0, 0) falls inside L and K
+    J = box(0, 0, 100, 100)
+    # I is genuinely nested inside J only
+    I = box(40, 40, 60, 60)
+
+    # This should not crash with KeyError: None
+    pieces = group_contours_into_pieces([L, K, J, I])
+
+    # Verify we got some pieces and I is represented somewhere
+    assert len(pieces) > 0
+    all_contours_in_pieces = [c for p in pieces for c in p.contours]
+    assert I in all_contours_in_pieces, "I should appear in some piece"

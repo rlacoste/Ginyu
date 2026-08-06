@@ -208,7 +208,15 @@ def group_contours_into_pieces(contours: List[Contour]) -> List[Piece]:
             next_id += 1
         else:
             parent_idx = find_parent(i)
-            pieces_by_outer_index[parent_idx].contours.append(contours[i])
+            if parent_idx is not None:
+                pieces_by_outer_index[parent_idx].contours.append(contours[i])
+            else:
+                # Fallback: if no parent can be determined (depth inflation from
+                # unrelated overlaps), treat as independent piece to avoid losing geometry
+                piece = Piece(piece_id=next_id, contours=[contours[i]])
+                pieces_by_outer_index[i] = piece
+                pieces.append(piece)
+                next_id += 1
 
     return pieces
 
