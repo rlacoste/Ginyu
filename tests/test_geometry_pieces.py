@@ -122,7 +122,51 @@ def test_group_contours_unattachable_hole_treated_as_independent_piece():
     # This should not crash with KeyError: None
     pieces = group_contours_into_pieces([L, K, J, I])
 
-    # Verify we got some pieces and I is represented somewhere
-    assert len(pieces) > 0
+    # Verify I is represented and treated as its own piece (since parent could not be determined)
     all_contours_in_pieces = [c for p in pieces for c in p.contours]
     assert I in all_contours_in_pieces, "I should appear in some piece"
+    # I should be the sole contour of its own piece due to orphaned parent
+    assert any(p.contours == [I] for p in pieces), "I should be its own independent piece"
+
+
+def test_group_contours_orphaned_parent_not_in_dict():
+    """Regression: when find_parent returns an index of an odd-depth contour
+    that was already attached as a child (not a dict key in pieces_by_outer_index),
+    the child should not crash but become an independent piece.
+
+    The 5-box configuration that reproduces this:
+    - boxes: [(10,6)-(11,32), (-5,10)-(19,34), (2,-10)-(32,-8), (10,13)-(32,43), (-10,4)-(13,14)]
+    - depths: [1, 1, 0, 3, 0]
+    - contour 3 finds parent_idx=0, but 0 was already attached to 4 as a child,
+      so pieces_by_outer_index[0] doesn't exist.
+    """
+    def box(min_x, min_y, max_x, max_y):
+        """Helper: create a closed rectangular contour."""
+        return Contour(
+            points=[
+                (min_x, min_y),
+                (max_x, min_y),
+                (max_x, max_y),
+                (min_x, max_y),
+                (min_x, min_y),
+            ]
+        )
+
+    # Exact 5-box configuration from the reviewer
+    box0 = box(10, 6, 11, 32)     # depth 1
+    box1 = box(-5, 10, 19, 34)    # depth 1
+    box2 = box(2, -10, 32, -8)    # depth 0
+    box3 = box(10, 13, 32, 43)    # depth 3
+    box4 = box(-10, 4, 13, 14)    # depth 0
+
+    # This should not crash with KeyError (whether None or missing key)
+    pieces = group_contours_into_pieces([box0, box1, box2, box3, box4])
+
+    # Verify all contours are represented somewhere
+    all_contours_in_pieces = [c for p in pieces for c in p.contours]
+    assert box0 in all_contours_in_pieces
+    assert box1 in all_contours_in_pieces
+    assert box2 in all_contours_in_pieces
+    assert box3 in all_contours_in_pieces
+    assert box4 in all_contours_in_pieces
+    assert len(all_contours_in_pieces) == 5, "All 5 contours should be preserved"
