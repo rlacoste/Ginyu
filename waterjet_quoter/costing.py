@@ -48,3 +48,40 @@ def compute_cutting_time(
             )
         )
     return CuttingTimeResult(pieces=piece_quotes, total_time_min=total_time_min)
+
+
+@dataclass
+class MaterialEstimateResult:
+    total_area_in2: float
+    sheets_needed: int
+    utilization_factor: float
+    warnings: List[str]
+
+
+def estimate_material(pieces: List[Piece], quantity: int) -> MaterialEstimateResult:
+    warnings = []
+    total_area_in2 = 0.0
+    for piece in pieces:
+        width, height = piece.bbox
+        total_area_in2 += piece.area_in2 * quantity
+        if max(width, height) > config.LARGE_PIECE_DIMENSION_THRESHOLD_IN:
+            warnings.append(
+                f"Pièce {piece.piece_id}: dimension max "
+                f"{max(width, height):.1f} po dépasse le seuil de "
+                f"{config.LARGE_PIECE_DIMENSION_THRESHOLD_IN} po — nesting "
+                f"manuel recommandé — estimation matière peu fiable pour "
+                f"cette pièce."
+            )
+
+    sheet_area_in2 = config.SHEET_WIDTH_IN * config.SHEET_HEIGHT_IN
+    usable_area_in2 = sheet_area_in2 * config.NESTING_UTILIZATION_FACTOR
+    sheets_needed = (
+        math.ceil(total_area_in2 / usable_area_in2) if total_area_in2 > 0 else 0
+    )
+
+    return MaterialEstimateResult(
+        total_area_in2=total_area_in2,
+        sheets_needed=sheets_needed,
+        utilization_factor=config.NESTING_UTILIZATION_FACTOR,
+        warnings=warnings,
+    )
