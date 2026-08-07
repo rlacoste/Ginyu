@@ -263,6 +263,67 @@ def test_extract_pieces_does_not_filter_small_but_above_tolerance_contour():
     assert not any("nulle" in w.lower() for w in result.warnings)
 
 
+def test_extract_pieces_aggregates_incomplete_contour_warnings():
+    """Regression: a DXF with many unrelated dangling LINE/ARC entities
+    (typical of dimension/annotation lines mixed into the cut geometry)
+    used to produce one "Contour incomplet..." warning per fragment. With
+    dozens of such fragments the warning list becomes unreadable noise.
+    They must be collapsed into a single summary warning instead.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    # Three unrelated, non-touching open fragments, far apart so they can't
+    # snap-chain into each other: a lone 2-point line, a 2-segment open
+    # chain (3 points), and a 3-segment open chain (4 points).
+    msp.add_line((0, 0), (1, 0))
+    msp.add_line((100, 100), (101, 100))
+    msp.add_line((101, 100), (101, 101))
+    msp.add_line((200, 200), (201, 200))
+    msp.add_line((201, 200), (201, 201))
+    msp.add_line((201, 201), (202, 201))
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    incomplete_warnings = [w for w in result.warnings if "incomplet" in w.lower()]
+    assert len(incomplete_warnings) == 1, (
+        "expected exactly one aggregated warning, not one per fragment: "
+        f"{result.warnings}"
+    )
+    assert "3" in incomplete_warnings[0]
+
+
+def test_extract_pieces_flags_duplicate_pieces():
+    """A client DXF that (accidentally) contains the same part traced twice
+    -- e.g. once for real, once inside the title block -- must not pass
+    through silently: no existing warning category catches "two distinct,
+    individually valid pieces with near-identical geometry".
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 6), (0, 6)], close=True)
+    msp.add_lwpolyline([(50, 50), (60, 50), (60, 56), (50, 56)], close=True)
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 2
+    duplicate_warnings = [w for w in result.warnings if "doublon" in w.lower()]
+    assert len(duplicate_warnings) == 1
+    assert "0" in duplicate_warnings[0] and "1" in duplicate_warnings[0]
+
+
+def test_extract_pieces_does_not_flag_distinct_pieces_as_duplicates():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 6), (0, 6)], close=True)
+    msp.add_lwpolyline([(50, 50), (58, 50), (58, 54), (50, 54)], close=True)
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 2
+    assert not any("doublon" in w.lower() for w in result.warnings)
+
+
 def test_group_contours_unattachable_hole_treated_as_independent_piece():
     """Regression: when depth inflation makes find_parent return None,
     the odd-depth contour should become an independent piece, not crash.

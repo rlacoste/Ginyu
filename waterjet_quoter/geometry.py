@@ -282,15 +282,72 @@ def extract_pieces(
                 )
                 continue
             closed_contours.append(Contour(points=chain))
-        for incomplete in chain_result.incomplete_contours:
-            warnings.append(
-                f"Contour incomplet détecté ({len(incomplete)} points) — "
-                f"segments non refermés en boucle, exclu du calcul."
-            )
+        if chain_result.incomplete_contours:
+            warnings.append(_summarize_incomplete_contours(chain_result.incomplete_contours))
 
     pieces = group_contours_into_pieces(closed_contours)
     if not pieces:
         warnings.append(
             "Aucune pièce exploitable détectée dans ce DXF — vérifier le fichier source."
         )
+    warnings.extend(_detect_duplicate_pieces(pieces))
     return ExtractionResult(pieces=pieces, warnings=warnings)
+
+
+def _summarize_incomplete_contours(incomplete_contours: List[List[Point]]) -> str:
+    """Collapse N "incomplete contour" fragments into one warning.
+
+    A DXF with many dimension/annotation lines mixed into the cut geometry
+    can produce dozens of individually-unremarkable incomplete fragments;
+    one warning line per fragment turns into unreadable noise.
+    """
+    counts = [len(c) for c in incomplete_contours]
+    if len(counts) == 1:
+        return (
+            f"Contour incomplet détecté ({counts[0]} points) — "
+            f"segments non refermés en boucle, exclu du calcul."
+        )
+    low, high = min(counts), max(counts)
+    point_range = f"{low} points" if low == high else f"{low} à {high} points"
+    return (
+        f"{len(counts)} contours incomplets détectés ({point_range}) — segments "
+        f"non refermés en boucle, exclus du calcul (probablement des lignes de "
+        f"cotation/annotation non fermées)."
+    )
+
+
+# Two pieces whose bbox width/height and cut length all match within this
+# tolerance (inches) are flagged as likely duplicates -- e.g. a part traced
+# once for real and once again inside a title block. This is deliberately
+# tight: independently traced geometry is never bit-for-bit identical, so a
+# loose tolerance would mask real distinct parts as "duplicates".
+_DUPLICATE_DIMENSION_TOLERANCE_IN = 0.01
+
+
+def _detect_duplicate_pieces(pieces: List[Piece]) -> List[str]:
+    """Flag pairs of pieces with near-identical bbox and cut length.
+
+    Does not merge or drop anything -- an order can legitimately contain two
+    identical parts -- it only signals so the possibility of an unintended
+    duplicate (e.g. a title-block trace) can be checked.
+    """
+    warnings: List[str] = []
+    for i in range(len(pieces)):
+        for j in range(i + 1, len(pieces)):
+            a, b = pieces[i], pieces[j]
+            if a.pierce_count != b.pierce_count:
+                continue
+            width_diff = abs(a.bbox[0] - b.bbox[0])
+            height_diff = abs(a.bbox[1] - b.bbox[1])
+            length_diff = abs(a.cut_length_in - b.cut_length_in)
+            if (
+                width_diff <= _DUPLICATE_DIMENSION_TOLERANCE_IN
+                and height_diff <= _DUPLICATE_DIMENSION_TOLERANCE_IN
+                and length_diff <= _DUPLICATE_DIMENSION_TOLERANCE_IN
+            ):
+                warnings.append(
+                    f"Pièces {a.piece_id} et {b.piece_id} semblent identiques "
+                    f"(dimensions et longueur de coupe similaires) — vérifier "
+                    f"s'il s'agit d'un doublon involontaire (ex. cartouche)."
+                )
+    return warnings
