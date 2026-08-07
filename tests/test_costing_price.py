@@ -2,6 +2,7 @@ import pytest
 
 from waterjet_quoter.costing import compute_price
 from waterjet_quoter import config
+from waterjet_quoter.materials import MaterialNotFoundError
 
 
 def test_compute_price_breaks_down_components():
@@ -20,5 +21,10 @@ def test_compute_price_breaks_down_components():
 
 
 def test_compute_price_raises_for_unknown_material():
-    with pytest.raises(KeyError):
+    with pytest.raises(MaterialNotFoundError) as exc_info:
         compute_price(total_time_min=60.0, sheets_needed=1, material="titanium")
+
+    message = str(exc_info.value)
+    assert not message.startswith('"')
+    assert not message.endswith('"')
+    assert "titanium" in message

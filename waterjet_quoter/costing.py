@@ -5,7 +5,7 @@ from typing import List
 
 from . import config
 from .geometry import Piece
-from .materials import MaterialParams
+from .materials import MaterialNotFoundError, MaterialParams
 
 
 @dataclass
@@ -97,7 +97,7 @@ class PricingResult:
 
 def compute_price(total_time_min: float, sheets_needed: int, material: str) -> PricingResult:
     if material not in config.SHEET_COST_BY_MATERIAL:
-        raise KeyError(
+        raise MaterialNotFoundError(
             f"No sheet cost configured for material {material!r} in "
             f"config.SHEET_COST_BY_MATERIAL."
         )

@@ -75,6 +75,46 @@ def test_main_cli_zero_qty_rejected(tmp_path, capsys):
     assert "Erreur" in captured.err
 
 
+def test_main_cli_config_desync_reports_clean_error(tmp_path, capsys, monkeypatch):
+    """Regression: if a material is in materials.json (so lookup() succeeds)
+    but missing from config.SHEET_COST_BY_MATERIAL, compute_price() now
+    raises materials.MaterialNotFoundError instead of a bare KeyError, so
+    it's caught by main()'s existing MaterialNotFoundError handler with a
+    clean (non-repr'd) message instead of a raw traceback.
+    """
+    from waterjet_quoter import config
+
+    dxf_path = tmp_path / "plate.dxf"
+    make_test_plate(str(dxf_path))
+    monkeypatch.delitem(config.SHEET_COST_BY_MATERIAL, "aluminum")
+
+    exit_code = main([str(dxf_path), "--material", "aluminum", "--thickness", "6mm"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur:" in captured.err
+    # Must go through the MaterialNotFoundError path (clean __str__), not a
+    # bare KeyError repr'd into the message with a stray quote.
+    assert '"No sheet cost' not in captured.err
+    assert "No sheet cost configured for material 'aluminum'" in captured.err
+
+
+def test_main_cli_truncated_dxf_does_not_raise_stopiteration(tmp_path, capsys):
+    """Regression: a truncated DXF file causes ezdxf's internal tagger to
+    raise a bare StopIteration from ezdxf.readfile(), which isn't an
+    ezdxf.DXFError or OSError subclass and previously escaped main()'s
+    exception handling entirely, producing a raw traceback.
+    """
+    dxf_path = tmp_path / "truncated.dxf"
+    dxf_path.write_text("0\nSECTION\n2\nHEADER\n")
+
+    exit_code = main([str(dxf_path), "--material", "aluminum", "--thickness", "6mm"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur" in captured.err
+
+
 def test_main_cli_negative_qty_rejected(tmp_path, capsys):
     dxf_path = tmp_path / "plate.dxf"
     make_test_plate(str(dxf_path))

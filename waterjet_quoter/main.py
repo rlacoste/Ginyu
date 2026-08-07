@@ -62,14 +62,14 @@ def main(argv=None) -> int:
     except FileNotFoundError:
         print(f"Erreur: fichier introuvable: {args.dxf_path}", file=sys.stderr)
         return 1
-    except ezdxf.DXFStructureError as e:
+    except ezdxf.DXFError as e:
         print(f"Erreur: fichier DXF invalide ou corrompu: {e}", file=sys.stderr)
         return 1
     except OSError as e:
         print(f"Erreur: impossible de lire le fichier {args.dxf_path}: {e}", file=sys.stderr)
         return 1
-    except KeyError as e:
-        print(f"Erreur: configuration incomplète: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Erreur inattendue: {e}", file=sys.stderr)
         return 1
 
     if args.json:
