@@ -28,3 +28,7 @@ def test_labor_flat_fees_has_required_categories():
     for category in ("programming", "setup", "shipping"):
         assert category in config.LABOR_FLAT_FEES
         assert config.LABOR_FLAT_FEES[category] >= 0
+
+
+def test_pierce_time_calibration_constant_is_positive():
+    assert config.PIERCE_TIME_CALIBRATION_CONSTANT > 0

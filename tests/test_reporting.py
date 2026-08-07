@@ -39,8 +39,8 @@ def _sample_result():
     input_meta = {
         "file": "plate.dxf",
         "material": "aluminum",
-        "thickness": "6mm",
-        "quality": "standard",
+        "thickness": 0.25,
+        "quality": "6061-T6",
         "quantity": 50,
     }
     return build_result_dict(input_meta, cutting_time, material_estimate, pricing, [])

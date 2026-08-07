@@ -17,14 +17,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("dxf_path", help="Chemin vers le fichier DXF")
     parser.add_argument("--material", required=True, help="Nom du matériau (ex: aluminum)")
-    parser.add_argument("--thickness", required=True, help="Épaisseur (ex: 6mm)")
-    parser.add_argument("--quality", default="standard", help="Niveau de finition (défaut: standard)")
+    parser.add_argument(
+        "--thickness", required=True, type=float, help="Épaisseur en pouces (ex: 0.25)"
+    )
+    parser.add_argument(
+        "--quality",
+        required=True,
+        help="Alliage/grade du matériau (ex: 6061-T6) -- aucune valeur par défaut sensée",
+    )
     parser.add_argument("--qty", type=int, default=1, help="Quantité commandée (défaut: 1)")
     parser.add_argument("--json", action="store_true", help="Affiche uniquement la sortie JSON")
     return parser
 
 
-def run(dxf_path: str, material: str, thickness: str, quality: str, qty: int) -> dict:
+def run(dxf_path: str, material: str, thickness: float, quality: str, qty: int) -> dict:
     drawing = load_dxf(dxf_path)
     extraction = extract_pieces(drawing)
     material_params = lookup(material, thickness, quality)

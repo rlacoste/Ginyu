@@ -35,7 +35,7 @@ def print_report(result: dict) -> None:
     inp = result["input"]
     print("=== Soumission waterjet ===")
     print(f"Fichier: {inp['file']}")
-    print(f"Matériau: {inp['material']} {inp['thickness']} (finition: {inp['quality']})")
+    print(f"Matériau: {inp['material']} {inp['thickness']}po (grade: {inp['quality']})")
     print(f"Quantité: {inp['quantity']}")
     print()
     print("--- Pièces ---")
