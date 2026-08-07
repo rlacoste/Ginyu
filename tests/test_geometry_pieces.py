@@ -147,6 +147,67 @@ def test_extract_pieces_empty_dxf_produces_no_pieces_warning():
     assert any("Aucune pièce" in w for w in result.warnings)
 
 
+def test_extract_pieces_skips_degenerate_spline_with_coincident_points():
+    """Regression: a closed spline whose fit points are all coincident makes
+    ezdxf.path.make_path() raise a bare IndexError (from ezdxf's internal
+    knots_from_parametrization), not TypeError/ValueError. extract_pieces
+    must catch this too, skip the entity, and warn instead of crashing.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    spline = msp.add_spline(fit_points=[(0, 0), (0, 0), (0, 0), (0, 0)])
+    spline.closed = True
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_skips_zero_length_line_alone_with_warning():
+    """Regression: a zero-length LINE flattens to two identical points,
+    passes the len(points) >= 2 guard, and gets chained into a fake
+    "closed" contour with zero cut length -- silently inflating piece
+    count/pierce time/price with no signal that anything was ignored.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_line((20, 20), (20, 20))
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_skips_zero_length_line_alongside_real_piece():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 6), (0, 6)], close=True)
+    msp.add_line((20, 20), (20, 20))
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 1
+    assert result.pieces[0].cut_length_in == pytest.approx(32.0, abs=1e-6)
+    assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_skips_zero_length_closed_polyline_with_warning():
+    """A degenerate closed LWPOLYLINE (all vertices coincident) takes the
+    "already closed" branch in extract_pieces (not the open-segment chainer)
+    -- the length check must also apply there, not just post-chaining.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(3, 3), (3, 3), (3, 3)], close=True)
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
+
+
 def test_group_contours_unattachable_hole_treated_as_independent_piece():
     """Regression: when depth inflation makes find_parent return None,
     the odd-depth contour should become an independent piece, not crash.

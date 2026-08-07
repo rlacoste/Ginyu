@@ -17,6 +17,12 @@ Point = Tuple[float, float]
 
 SUPPORTED_DXFTYPES = {"LINE", "ARC", "CIRCLE", "LWPOLYLINE", "POLYLINE", "SPLINE"}
 
+# Contours whose total perimeter falls below this (inches) are treated as
+# degenerate drawing artefacts (e.g. a zero-length LINE, or a closed entity
+# whose vertices all coincide) rather than real geometry, and are skipped
+# with a warning instead of being counted as a piece.
+_MIN_CONTOUR_LENGTH_IN = 1e-6
+
 
 def flatten_entity(entity, distance: float) -> List[Point]:
     """Convert any supported DXF entity into a polyline of (x, y) points."""
@@ -245,7 +251,7 @@ def extract_pieces(
             continue
         try:
             points = flatten_entity(entity, flattening_distance)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, IndexError) as exc:
             warnings.append(
                 f"Entité {entity.dxftype()} ignorée : géométrie non exploitable ({exc})."
             )
@@ -259,13 +265,24 @@ def extract_pieces(
         if is_entity_closed(entity):
             if points[0] != points[-1]:
                 points = points + [points[0]]
+            if polyline_length(points) < _MIN_CONTOUR_LENGTH_IN:
+                warnings.append(
+                    "Contour de longueur quasi nulle ignoré (probable artefact de dessin)."
+                )
+                continue
             closed_contours.append(Contour(points=points))
         else:
             open_segments.append(points)
 
     if open_segments:
         chain_result = chain_open_segments(open_segments, chaining_tolerance)
-        closed_contours.extend(Contour(points=c) for c in chain_result.closed_contours)
+        for chain in chain_result.closed_contours:
+            if polyline_length(chain) < _MIN_CONTOUR_LENGTH_IN:
+                warnings.append(
+                    "Contour de longueur quasi nulle ignoré (probable artefact de dessin)."
+                )
+                continue
+            closed_contours.append(Contour(points=chain))
         for incomplete in chain_result.incomplete_contours:
             warnings.append(
                 f"Contour incomplet détecté ({len(incomplete)} points) — "
