@@ -17,12 +17,6 @@ Point = Tuple[float, float]
 
 SUPPORTED_DXFTYPES = {"LINE", "ARC", "CIRCLE", "LWPOLYLINE", "POLYLINE", "SPLINE"}
 
-# Contours whose total perimeter falls below this (inches) are treated as
-# degenerate drawing artefacts (e.g. a zero-length LINE, or a closed entity
-# whose vertices all coincide) rather than real geometry, and are skipped
-# with a warning instead of being counted as a piece.
-_MIN_CONTOUR_LENGTH_IN = 1e-6
-
 
 def flatten_entity(entity, distance: float) -> List[Point]:
     """Convert any supported DXF entity into a polyline of (x, y) points."""
@@ -265,7 +259,12 @@ def extract_pieces(
         if is_entity_closed(entity):
             if points[0] != points[-1]:
                 points = points + [points[0]]
-            if polyline_length(points) < _MIN_CONTOUR_LENGTH_IN:
+            # A contour whose entire perimeter fits within the chaining
+            # tolerance is degenerate by construction: it can only "close"
+            # because its own endpoints snapped together, not because it
+            # traces any real geometry. The tolerance is a natural floor
+            # here since it's already ~30x below a real waterjet kerf.
+            if polyline_length(points) <= chaining_tolerance:
                 warnings.append(
                     "Contour de longueur quasi nulle ignoré (probable artefact de dessin)."
                 )
@@ -277,7 +276,7 @@ def extract_pieces(
     if open_segments:
         chain_result = chain_open_segments(open_segments, chaining_tolerance)
         for chain in chain_result.closed_contours:
-            if polyline_length(chain) < _MIN_CONTOUR_LENGTH_IN:
+            if polyline_length(chain) <= chaining_tolerance:
                 warnings.append(
                     "Contour de longueur quasi nulle ignoré (probable artefact de dessin)."
                 )

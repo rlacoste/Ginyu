@@ -208,6 +208,61 @@ def test_extract_pieces_skips_zero_length_closed_polyline_with_warning():
     assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
 
 
+def test_extract_pieces_filters_line_shorter_than_chaining_tolerance():
+    """Regression: a LINE whose length falls below the chaining tolerance
+    (default 1e-3 in) still snap-closes into a phantom 1-contour "piece" via
+    _snap()'s rounding, even though it's nowhere near zero-length. A fixed
+    _MIN_CONTOUR_LENGTH_IN of 1e-6 never caught this -- the degeneracy
+    threshold must track chaining_tolerance itself, since any contour that
+    only "closes" because two points snapped together within that tolerance
+    is degenerate by construction.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    # 2e-4 in: below the default 1e-3 chaining tolerance, but well above the
+    # old fixed 1e-6 threshold -- exactly the gap the reviewer identified.
+    msp.add_line((0, 0), (2e-4, 0))
+
+    result = extract_pieces(doc)
+
+    assert result.pieces == []
+    assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_filters_gap_length_line_alongside_real_piece():
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    msp.add_lwpolyline([(0, 0), (10, 0), (10, 6), (0, 6)], close=True)
+    msp.add_line((20, 20), (20 + 2e-4, 20))
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 1
+    assert result.pieces[0].cut_length_in == pytest.approx(32.0, abs=1e-6)
+    assert any("ignor" in w.lower() or "nulle" in w.lower() for w in result.warnings)
+
+
+def test_extract_pieces_does_not_filter_small_but_above_tolerance_contour():
+    """Guard against over-filtering: a small but legitimate closed contour
+    whose perimeter is comfortably above the chaining tolerance must still
+    be treated as real geometry, not swept up by the degeneracy filter.
+    """
+    doc = ezdxf.new(setup=True)
+    msp = doc.modelspace()
+    # Side length 0.01in -> perimeter 0.04in, ~40x the default 1e-3
+    # chaining tolerance and still ~3x below a typical waterjet kerf, but
+    # unambiguously not a snapping artefact.
+    msp.add_lwpolyline(
+        [(0, 0), (0.01, 0), (0.01, 0.01), (0, 0.01)], close=True
+    )
+
+    result = extract_pieces(doc)
+
+    assert len(result.pieces) == 1
+    assert result.pieces[0].cut_length_in == pytest.approx(0.04, abs=1e-6)
+    assert not any("nulle" in w.lower() for w in result.warnings)
+
+
 def test_group_contours_unattachable_hole_treated_as_independent_piece():
     """Regression: when depth inflation makes find_parent return None,
     the odd-depth contour should become an independent piece, not crash.

@@ -69,7 +69,7 @@ def main(argv=None) -> int:
         print(f"Erreur: impossible de lire le fichier {args.dxf_path}: {e}", file=sys.stderr)
         return 1
     except Exception as e:
-        print(f"Erreur inattendue: {e}", file=sys.stderr)
+        print(f"Erreur inattendue ({type(e).__name__}): {e}", file=sys.stderr)
         return 1
 
     if args.json:

@@ -113,6 +113,10 @@ def test_main_cli_truncated_dxf_does_not_raise_stopiteration(tmp_path, capsys):
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "Erreur" in captured.err
+    # StopIteration has an empty str(), so the message must not be a bare
+    # "Erreur inattendue:" with nothing after the colon -- the exception
+    # type name should be included so the message still carries information.
+    assert "StopIteration" in captured.err
 
 
 def test_main_cli_negative_qty_rejected(tmp_path, capsys):
