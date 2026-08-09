@@ -18,14 +18,18 @@ def test_machine_rate_default():
     assert config.MACHINE_RATE_PER_HOUR == 125.0
 
 
-def test_sheet_cost_by_material_has_required_materials():
+def test_density_has_required_materials():
     # Keys must match the `material` column values in the Postgres
-    # materials table (iGEMS naming), not an invented slug -- otherwise
-    # compute_price() can't find a sheet cost for a material lookup() just
-    # successfully resolved.
-    for material in ("Aluminium", "Mild Steel", "Stainless Steel"):
-        assert material in config.SHEET_COST_BY_MATERIAL
-        assert config.SHEET_COST_BY_MATERIAL[material] > 0
+    # materials/material_prices tables (iGEMS naming), not an invented slug
+    # -- otherwise compute_price() can't find a density for a material
+    # lookup() just successfully resolved.
+    for material in ("Aluminium", "Mild Steel", "Stainless Steel", "Copper"):
+        assert material in config.DENSITY_KG_PER_M3
+        assert config.DENSITY_KG_PER_M3[material] > 0
+
+
+def test_material_cost_adjustment_factor_is_positive():
+    assert config.MATERIAL_COST_ADJUSTMENT_FACTOR > 0
 
 
 def test_labor_flat_fees_has_required_categories():

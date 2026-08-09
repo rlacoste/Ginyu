@@ -10,12 +10,16 @@ entièrement (table matériaux JSON → Postgres, `pierce_time` retiré).
 
 Lit un fichier DXF, en extrait la géométrie de coupe (contours, perçages,
 bounding box), calcule un temps de coupe / une estimation de matière / un
-prix à partir d'une table de matériaux (Postgres/Supabase, alimentée par un
-export iGEMS), et affiche le résultat en texte lisible + JSON structuré.
+prix à partir de deux tables Postgres/Supabase — les paramètres de coupe
+(alimentés par un export iGEMS) et le prix dynamique par matériau (voir
+[Prix matière et tarif machine](#prix-matière-et-tarif-machine)) — et
+affiche le résultat en texte lisible + JSON structuré.
 
-C'est un prototype : les prix de feuilles (`SHEET_COST_BY_MATERIAL`) et les
-forfaits de main-d'œuvre (`LABOR_FLAT_FEES`) dans `waterjet_quoter/config.py`
-sont encore des valeurs inventées à remplacer par tes vrais chiffres.
+C'est un prototype : les forfaits de main-d'œuvre (`LABOR_FLAT_FEES`), le
+facteur d'ajustement matière (`MATERIAL_COST_ADJUSTMENT_FACTOR`) et une
+partie des densités (`DENSITY_KG_PER_M3`) dans `waterjet_quoter/config.py`
+sont encore des valeurs à vérifier/calibrer avec tes vrais chiffres — voir
+l'avertissement de qualité de données directement dans ce dict.
 
 ## Installation / setup
 
@@ -133,6 +137,48 @@ iGEMS ne le fournissait pas et le concept a été abandonné). `pierce_count`
 reste affiché par pièce à titre indicatif (nombre de contours/amorces de
 coupe), mais ne pèse plus dans le temps calculé.
 
+## Prix matière et tarif machine
+
+Le coût matière **n'est pas** basé sur le nombre de feuilles complètes
+nécessaires — il est basé sur l'aire nette réellement consommée par les
+pièces (les chutes sont réutilisées/re-nesting jusqu'à épuisement, donc
+facturer une feuille complète par job surestimerait le coût) :
+
+```
+poids_lb = aire_nette_po² × épaisseur_po × densité_lb/po³
+coût_matière = poids_lb × prix_au_lb × MATERIAL_COST_ADJUSTMENT_FACTOR
+```
+
+`sheets_needed` reste calculé et affiché (utile pour savoir combien de
+feuilles tirer du stock), mais ne sert plus au calcul du prix.
+
+Le tarif machine horaire de base (`MACHINE_RATE_PER_HOUR`, 125$/h par
+défaut) est multiplié par le `machine_rate_multiplier` du matériau — utile
+pour les matériaux exclusivement waterjet (cuivre, certains plastiques,
+alliages épais) qui coûtent plus cher à découper, typiquement ×2.
+
+**Deux sources différentes, séparées volontairement** :
+- **Densité** (`config.DENSITY_KG_PER_M3`) — constante physique par
+  matériau, quasiment jamais mise à jour. Vit dans `config.py`.
+- **Prix au poids + multiplicateur de tarif machine** (table Postgres
+  `material_prices`) — change fréquemment (hebdomadaire ou selon le
+  marché). C'est le moteur du pricing dynamique.
+
+Ajouter ou mettre à jour un prix :
+
+```bash
+python -m waterjet_quoter.set_material_price \
+  --material Copper --price-per-lb 4.50 --machine-rate-multiplier 2.0
+
+python -m waterjet_quoter.set_material_price \
+  --material Aluminium --price-per-lb 1.85   # machine_rate_multiplier omis -> 1.0
+```
+
+Idempotent (upsert par matériau). Un matériau sans ligne dans
+`material_prices`, ou sans entrée dans `config.DENSITY_KG_PER_M3`, fait
+échouer la soumission avec une erreur explicite plutôt qu'un prix à zéro
+ou deviné.
+
 ## Comprendre les avertissements (`geometry_warnings`)
 
 Le moteur signale explicitement plutôt que de deviner. Types d'avertissement
@@ -155,7 +201,7 @@ avec des contours fermés (pas seulement du texte/des cotes), il sera compté
 comme une pièce supplémentaire. **Toujours vérifier le nombre de pièces et
 les avertissements avant d'envoyer une soumission.**
 
-## Mettre à jour les données matériaux
+## Mettre à jour les paramètres de coupe (feed rate)
 
 Quand un nouvel export iGEMS est disponible :
 

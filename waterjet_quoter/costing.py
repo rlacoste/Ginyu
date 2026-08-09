@@ -1,11 +1,15 @@
 """Cutting time, material estimate, and price calculations."""
 import math
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 from . import config
 from .geometry import Piece
 from .materials import MaterialNotFoundError, MaterialParams
+from .material_prices import lookup_price
+
+# 1 kg/m^3 expressed in lb/in^3 (1 kg = 2.2046226218 lb, 1 m^3 = 61023.7441 in^3).
+KG_PER_M3_TO_LB_PER_IN3 = 3.612729e-5
 
 
 @dataclass
@@ -93,14 +97,33 @@ class PricingResult:
     total_price: float
 
 
-def compute_price(total_time_min: float, sheets_needed: int, material: str) -> PricingResult:
-    if material not in config.SHEET_COST_BY_MATERIAL:
+def compute_price(
+    total_time_min: float,
+    net_area_in2: float,
+    thickness_in: float,
+    material: str,
+    price_table: Optional[dict] = None,
+) -> PricingResult:
+    """Price a job from net part area (not full sheets -- offcuts are kept
+    and nested into on later jobs rather than charged per-job) plus machine
+    time at a material-specific rate.
+    """
+    if material not in config.DENSITY_KG_PER_M3:
         raise MaterialNotFoundError(
-            f"No sheet cost configured for material {material!r} in "
-            f"config.SHEET_COST_BY_MATERIAL."
+            f"Aucune densité configurée pour le matériau {material!r} dans "
+            f"config.DENSITY_KG_PER_M3."
         )
-    machine_time_cost = (total_time_min / 60.0) * config.MACHINE_RATE_PER_HOUR
-    material_cost = sheets_needed * config.SHEET_COST_BY_MATERIAL[material]
+    price_params = lookup_price(material, table=price_table)
+
+    density_lb_per_in3 = config.DENSITY_KG_PER_M3[material] * KG_PER_M3_TO_LB_PER_IN3
+    weight_lb = net_area_in2 * thickness_in * density_lb_per_in3
+    material_cost = (
+        weight_lb * price_params.price_per_lb * config.MATERIAL_COST_ADJUSTMENT_FACTOR
+    )
+
+    effective_machine_rate = config.MACHINE_RATE_PER_HOUR * price_params.machine_rate_multiplier
+    machine_time_cost = (total_time_min / 60.0) * effective_machine_rate
+
     labor_cost = sum(config.LABOR_FLAT_FEES.values())
     total_price = machine_time_cost + material_cost + labor_cost
     return PricingResult(

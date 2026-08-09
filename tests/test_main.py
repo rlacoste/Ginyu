@@ -4,12 +4,16 @@ from waterjet_quoter.make_test_dxf import make_test_plate
 from waterjet_quoter.materials import MaterialNotFoundError
 from waterjet_quoter.main import run, main
 
-# Materials now come from Postgres in production; unit tests inject a fake
-# table so the suite never needs a live database connection.
+# Materials and prices now come from Postgres in production; unit tests
+# inject fake tables so the suite never needs a live database connection.
 FAKE_MATERIALS_TABLE = {
     "Aluminium": {
         0.25: {"6061-T6": {"feed_rate_ipm": 18.0}},
     },
+}
+
+FAKE_PRICE_TABLE = {
+    "Aluminium": {"price_per_lb": 1.85, "machine_rate_multiplier": 1.0},
 }
 
 
@@ -17,6 +21,10 @@ FAKE_MATERIALS_TABLE = {
 def fake_materials_table(monkeypatch):
     monkeypatch.setattr(
         "waterjet_quoter.materials.load_table", lambda *a, **k: FAKE_MATERIALS_TABLE
+    )
+    monkeypatch.setattr(
+        "waterjet_quoter.material_prices.load_price_table",
+        lambda *a, **k: FAKE_PRICE_TABLE,
     )
 
 
@@ -96,18 +104,17 @@ def test_main_cli_zero_qty_rejected(tmp_path, capsys):
     assert "Erreur" in captured.err
 
 
-def test_main_cli_config_desync_reports_clean_error(tmp_path, capsys, monkeypatch):
-    """Regression: if a material is in the materials table (so lookup()
-    succeeds) but missing from config.SHEET_COST_BY_MATERIAL, compute_price()
-    raises materials.MaterialNotFoundError instead of a bare KeyError, so
-    it's caught by main()'s existing MaterialNotFoundError handler with a
-    clean (non-repr'd) message instead of a raw traceback.
+def test_main_cli_missing_price_reports_clean_error(tmp_path, capsys, monkeypatch):
+    """Regression: if a material is in the materials/cutting-params table
+    (so lookup() succeeds) but has no row in material_prices, compute_price()
+    raises materials.MaterialNotFoundError with a clean (non-repr'd)
+    message instead of a raw traceback.
     """
-    from waterjet_quoter import config
-
     dxf_path = tmp_path / "plate.dxf"
     make_test_plate(str(dxf_path))
-    monkeypatch.delitem(config.SHEET_COST_BY_MATERIAL, "Aluminium")
+    monkeypatch.setattr(
+        "waterjet_quoter.material_prices.load_price_table", lambda *a, **k: {}
+    )
 
     exit_code = main(
         [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
@@ -116,10 +123,29 @@ def test_main_cli_config_desync_reports_clean_error(tmp_path, capsys, monkeypatc
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "Erreur:" in captured.err
-    # Must go through the MaterialNotFoundError path (clean __str__), not a
-    # bare KeyError repr'd into the message with a stray quote.
-    assert '"No sheet cost' not in captured.err
-    assert "No sheet cost configured for material 'Aluminium'" in captured.err
+    assert not captured.err.startswith('Erreur: "')
+    assert "Aluminium" in captured.err
+
+
+def test_main_cli_missing_density_reports_clean_error(tmp_path, capsys, monkeypatch):
+    """Regression: if a material has a price but no density configured in
+    config.DENSITY_KG_PER_M3, compute_price() raises a clean
+    MaterialNotFoundError rather than a KeyError.
+    """
+    from waterjet_quoter import config
+
+    dxf_path = tmp_path / "plate.dxf"
+    make_test_plate(str(dxf_path))
+    monkeypatch.delitem(config.DENSITY_KG_PER_M3, "Aluminium")
+
+    exit_code = main(
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "Erreur:" in captured.err
+    assert "Aluminium" in captured.err
 
 
 def test_main_cli_truncated_dxf_does_not_raise_stopiteration(tmp_path, capsys):

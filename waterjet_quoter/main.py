@@ -37,7 +37,9 @@ def run(dxf_path: str, material: str, thickness: float, quality: str, qty: int) 
 
     cutting_time = compute_cutting_time(extraction.pieces, material_params, qty)
     material_estimate = estimate_material(extraction.pieces, qty)
-    pricing = compute_price(cutting_time.total_time_min, material_estimate.sheets_needed, material)
+    pricing = compute_price(
+        cutting_time.total_time_min, material_estimate.total_area_in2, thickness, material
+    )
 
     input_meta = {
         "file": dxf_path,
