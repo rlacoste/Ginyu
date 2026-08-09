@@ -6,10 +6,10 @@ from waterjet_quoter.materials import MaterialNotFoundError
 
 
 def test_compute_price_breaks_down_components():
-    result = compute_price(total_time_min=120.0, sheets_needed=3, material="aluminum")
+    result = compute_price(total_time_min=120.0, sheets_needed=3, material="Aluminium")
 
     expected_machine_cost = (120.0 / 60.0) * config.MACHINE_RATE_PER_HOUR
-    expected_material_cost = 3 * config.SHEET_COST_BY_MATERIAL["aluminum"]
+    expected_material_cost = 3 * config.SHEET_COST_BY_MATERIAL["Aluminium"]
     expected_labor_cost = sum(config.LABOR_FLAT_FEES.values())
 
     assert result.machine_time_cost == pytest.approx(expected_machine_cost)

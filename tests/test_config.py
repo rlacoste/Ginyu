@@ -19,7 +19,11 @@ def test_machine_rate_default():
 
 
 def test_sheet_cost_by_material_has_required_materials():
-    for material in ("aluminum", "mild_steel", "stainless_steel"):
+    # Keys must match the `material` column values in the Postgres
+    # materials table (iGEMS naming), not an invented slug -- otherwise
+    # compute_price() can't find a sheet cost for a material lookup() just
+    # successfully resolved.
+    for material in ("Aluminium", "Mild Steel", "Stainless Steel"):
         assert material in config.SHEET_COST_BY_MATERIAL
         assert config.SHEET_COST_BY_MATERIAL[material] > 0
 

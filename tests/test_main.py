@@ -7,7 +7,7 @@ from waterjet_quoter.main import run, main
 # Materials now come from Postgres in production; unit tests inject a fake
 # table so the suite never needs a live database connection.
 FAKE_MATERIALS_TABLE = {
-    "aluminum": {
+    "Aluminium": {
         0.25: {"6061-T6": {"feed_rate_ipm": 18.0}},
     },
 }
@@ -24,7 +24,7 @@ def test_run_end_to_end_matches_expected_test_plate_values(tmp_path):
     dxf_path = tmp_path / "plate.dxf"
     make_test_plate(str(dxf_path))
 
-    result = run(str(dxf_path), material="aluminum", thickness=0.25, quality="6061-T6", qty=50)
+    result = run(str(dxf_path), material="Aluminium", thickness=0.25, quality="6061-T6", qty=50)
 
     assert len(result["pieces"]) == 1
     piece = result["pieces"][0]
@@ -49,7 +49,7 @@ def test_main_cli_success_exit_code(tmp_path, capsys):
     make_test_plate(str(dxf_path))
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
     )
 
     captured = capsys.readouterr()
@@ -75,7 +75,7 @@ def test_main_cli_malformed_dxf_exit_code(tmp_path, capsys):
     dxf_path.write_bytes(b"not a real dxf file\nrandom garbage bytes\n")
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
     )
 
     captured = capsys.readouterr()
@@ -88,7 +88,7 @@ def test_main_cli_zero_qty_rejected(tmp_path, capsys):
     make_test_plate(str(dxf_path))
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6", "--qty", "0"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6", "--qty", "0"]
     )
 
     captured = capsys.readouterr()
@@ -107,10 +107,10 @@ def test_main_cli_config_desync_reports_clean_error(tmp_path, capsys, monkeypatc
 
     dxf_path = tmp_path / "plate.dxf"
     make_test_plate(str(dxf_path))
-    monkeypatch.delitem(config.SHEET_COST_BY_MATERIAL, "aluminum")
+    monkeypatch.delitem(config.SHEET_COST_BY_MATERIAL, "Aluminium")
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
     )
 
     captured = capsys.readouterr()
@@ -119,7 +119,7 @@ def test_main_cli_config_desync_reports_clean_error(tmp_path, capsys, monkeypatc
     # Must go through the MaterialNotFoundError path (clean __str__), not a
     # bare KeyError repr'd into the message with a stray quote.
     assert '"No sheet cost' not in captured.err
-    assert "No sheet cost configured for material 'aluminum'" in captured.err
+    assert "No sheet cost configured for material 'Aluminium'" in captured.err
 
 
 def test_main_cli_truncated_dxf_does_not_raise_stopiteration(tmp_path, capsys):
@@ -132,7 +132,7 @@ def test_main_cli_truncated_dxf_does_not_raise_stopiteration(tmp_path, capsys):
     dxf_path.write_text("0\nSECTION\n2\nHEADER\n")
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6"]
     )
 
     captured = capsys.readouterr()
@@ -149,7 +149,7 @@ def test_main_cli_negative_qty_rejected(tmp_path, capsys):
     make_test_plate(str(dxf_path))
 
     exit_code = main(
-        [str(dxf_path), "--material", "aluminum", "--thickness", "0.25", "--quality", "6061-T6", "--qty", "-5"]
+        [str(dxf_path), "--material", "Aluminium", "--thickness", "0.25", "--quality", "6061-T6", "--qty", "-5"]
     )
 
     captured = capsys.readouterr()
@@ -166,7 +166,7 @@ def test_main_cli_requires_quality(tmp_path, capsys):
     make_test_plate(str(dxf_path))
 
     with pytest.raises(SystemExit):
-        main([str(dxf_path), "--material", "aluminum", "--thickness", "0.25"])
+        main([str(dxf_path), "--material", "Aluminium", "--thickness", "0.25"])
 
     captured = capsys.readouterr()
     assert "--quality" in captured.err

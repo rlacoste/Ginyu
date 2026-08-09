@@ -19,11 +19,14 @@ LARGE_PIECE_DIMENSION_THRESHOLD_IN = 40.0
 MACHINE_RATE_PER_HOUR = 125.0
 
 # Sheet cost per material, in dollars. Placeholder values -- replace with
-# real supplier pricing.
+# real supplier pricing. Keys must match the `material` column values in
+# the Postgres materials table (iGEMS naming), e.g. "Aluminium" not
+# "aluminum" -- compute_price() looks a material up here by that exact
+# string once lookup() has already resolved it.
 SHEET_COST_BY_MATERIAL = {
-    "aluminum": 220.0,
-    "mild_steel": 150.0,
-    "stainless_steel": 340.0,
+    "Aluminium": 220.0,
+    "Mild Steel": 150.0,
+    "Stainless Steel": 340.0,
 }
 
 # Flat labor fees applied per job, in dollars. Placeholder values.
