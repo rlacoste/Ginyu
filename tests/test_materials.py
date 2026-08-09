@@ -1,8 +1,6 @@
-import os
-
 import pytest
 
-from waterjet_quoter import config
+from waterjet_quoter.db import _resolve_database_url
 from waterjet_quoter.materials import (
     MaterialNotFoundError,
     _rows_to_table,
@@ -33,15 +31,12 @@ def test_rows_to_table_normalizes_thickness_precision():
     assert 0.25 in table["Aluminium"]
 
 
-def test_lookup_computes_pierce_time_from_feed_rate():
+def test_lookup_returns_feed_rate():
     table = {"Aluminium": {0.25: {"6061 T6": {"feed_rate_ipm": 100.0}}}}
 
     params = lookup("Aluminium", 0.25, "6061 T6", table=table)
 
     assert params.feed_rate_ipm == 100.0
-    assert params.pierce_time_sec == pytest.approx(
-        config.PIERCE_TIME_CALIBRATION_CONSTANT / 100.0
-    )
 
 
 def test_lookup_normalizes_thickness_for_matching():
@@ -103,7 +98,7 @@ def test_material_not_found_error_str_has_no_stray_quotes():
 
 
 @pytest.mark.skipif(
-    not os.environ.get("DATABASE_URL"),
+    not _resolve_database_url(),
     reason="DATABASE_URL not configured -- requires a live Supabase connection",
 )
 def test_load_table_from_real_database_has_entries():

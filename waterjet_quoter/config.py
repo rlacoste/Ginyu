@@ -43,9 +43,3 @@ CHAINING_TOLERANCE_IN = 1e-3
 # Maximum deviation (inches) allowed when flattening curves (ARC, CIRCLE,
 # SPLINE) into straight-line segments for length/perimeter calculations.
 FLATTENING_DISTANCE_IN = 0.01
-
-# Pierce time is not tracked directly in the iGEMS materials export -- it is
-# derived from the cutting feed rate as PIERCE_TIME_CALIBRATION_CONSTANT /
-# feed_rate_ipm. This starting value is an arbitrary placeholder; calibrate
-# it against a real known job before trusting quoted pierce times.
-PIERCE_TIME_CALIBRATION_CONSTANT = 100.0

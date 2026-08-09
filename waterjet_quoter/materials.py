@@ -1,5 +1,4 @@
-"""Loads and looks up the materials reference table (feed rate; pierce time
-is derived from it, see lookup()).
+"""Loads and looks up the materials reference table (cutting feed rate).
 
 The table lives in a Postgres `materials` table (see db.py, db/schema.sql),
 indexed by material -> thickness_in -> quality (quality here means the
@@ -10,7 +9,6 @@ and look values up; costing.py never queries the database directly.
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from . import config
 from .db import get_connection
 
 _THICKNESS_PRECISION = 4
@@ -26,7 +24,6 @@ class MaterialNotFoundError(KeyError):
 @dataclass(frozen=True)
 class MaterialParams:
     feed_rate_ipm: float
-    pierce_time_sec: float
 
 
 def _normalize_thickness(thickness: float) -> float:
@@ -102,5 +99,4 @@ def lookup(
         )
 
     feed_rate_ipm = qualities_for_thickness[quality]["feed_rate_ipm"]
-    pierce_time_sec = config.PIERCE_TIME_CALIBRATION_CONSTANT / feed_rate_ipm
-    return MaterialParams(feed_rate_ipm=feed_rate_ipm, pierce_time_sec=pierce_time_sec)
+    return MaterialParams(feed_rate_ipm=feed_rate_ipm)

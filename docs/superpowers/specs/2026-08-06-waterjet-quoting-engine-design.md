@@ -1,5 +1,17 @@
 # Moteur de soumission waterjet — Design V1
 
+> **Note (2026-08-08) :** ce document capture les décisions de design d'origine
+> et n'a pas été mis à jour ligne par ligne depuis. Deux changements majeurs
+> depuis : (1) la table matériaux vit maintenant dans Postgres/Supabase, pas
+> `materials.json` (voir `db/schema.sql`, `waterjet_quoter/db.py`,
+> `waterjet_quoter/import_materials.py`) — `quality` y désigne l'alliage/grade
+> réel (ex. "6061 T6"), pas un niveau de finition, et `thickness` est un
+> nombre décimal en pouces, pas une étiquette "6mm"/"12mm" ; (2) le temps de
+> perçage (`pierce_time`) a été retiré complètement — le temps de coupe est
+> uniquement `longueur_de_coupe / feed_rate`. Pour l'usage courant du CLI,
+> voir le README dans ce même dossier ; ce document reste une référence
+> historique du design initial.
+
 ## Contexte et objectif
 
 Prototype en Python pur qui lit un fichier DXF 2D, en extrait la géométrie
@@ -57,7 +69,7 @@ waterjet_quoter/
 ├── ingestion.py          # Frontière de source du fichier (remplaçable plus tard)
 ├── geometry.py            # Extraction géométrique par pièce
 ├── materials.py            # Chargement + lookup de la table matériaux
-├── materials.json           # Données de référence (feed rate, pierce time)
+├── materials.json           # Données de référence (feed rate)
 ├── costing.py                 # Temps de coupe, estimation matière, calcul de prix
 ├── config.py                    # Constantes ajustables
 ├── reporting.py                   # Sortie lisible (CLI) + dict/JSON structuré
@@ -80,7 +92,7 @@ implémentation du même contrat), rien d'autre.
 main.py (CLI args)
   → ingestion.load_dxf(path) → ezdxf.Drawing
   → geometry.extract_pieces(drawing) → list[Piece]
-  → materials.lookup(material, thickness, quality) → feed_rate, pierce_time
+  → materials.lookup(material, thickness, quality) → feed_rate
   → costing.compute_quote(pieces, material_params, qty, config) → résultat structuré
   → reporting.print_report(résultat) + reporting.to_json(résultat)
 ```
@@ -134,22 +146,22 @@ Format à 3 niveaux : matériau → épaisseur → finition.
 ```json
 {
   "aluminum": {
-    "6mm": { "standard": { "feed_rate_ipm": 18.0, "pierce_time_sec": 3.0 } },
-    "12mm": { "standard": { "feed_rate_ipm": 9.0, "pierce_time_sec": 6.0 } }
+    "6mm": { "standard": { "feed_rate_ipm": 18.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 9.0 } }
   },
   "mild_steel": {
-    "6mm": { "standard": { "feed_rate_ipm": 14.0, "pierce_time_sec": 4.0 } },
-    "12mm": { "standard": { "feed_rate_ipm": 7.0, "pierce_time_sec": 8.0 } }
+    "6mm": { "standard": { "feed_rate_ipm": 14.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 7.0 } }
   },
   "stainless_steel": {
-    "6mm": { "standard": { "feed_rate_ipm": 10.0, "pierce_time_sec": 5.0 } },
-    "12mm": { "standard": { "feed_rate_ipm": 5.0, "pierce_time_sec": 10.0 } }
+    "6mm": { "standard": { "feed_rate_ipm": 10.0 } },
+    "12mm": { "standard": { "feed_rate_ipm": 5.0 } }
   }
 }
 ```
 
 `materials.py` expose `lookup(material: str, thickness: str, quality: str = "standard") -> MaterialParams`
-(feed rate, pierce time). Si le triplet n'existe pas dans la table, lève une
+(feed rate). Si le triplet n'existe pas dans la table, lève une
 exception explicite (nom du triplet manquant dans le message) — pas de
 valeur par défaut devinée. Le module ne fait que charger le JSON et
 indexer dessus ; aucune valeur n'est codée en dur dans `materials.py`, pour
@@ -161,7 +173,7 @@ reste du moteur.
 Temps de coupe unitaire d'une pièce :
 
 ```
-temps_unitaire = (longueur_totale_coupe / feed_rate) + (nombre_perçages × pierce_time)
+temps_unitaire = longueur_totale_coupe / feed_rate
 ```
 
 Agrégé par pièce (type distinct, pas par occurrence) : `temps_unitaire`,

@@ -32,9 +32,7 @@ def compute_cutting_time(
     total_time_min = 0.0
     for piece in pieces:
         width, height = piece.bbox
-        pierce_time_min = (piece.pierce_count * material.pierce_time_sec) / 60.0
-        cut_time_min = piece.cut_length_in / material.feed_rate_ipm
-        unit_time_min = cut_time_min + pierce_time_min
+        unit_time_min = piece.cut_length_in / material.feed_rate_ipm
         total_time_min += unit_time_min * quantity
         piece_quotes.append(
             PieceQuote(
